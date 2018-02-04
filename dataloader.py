@@ -18,7 +18,7 @@ class FileLoader(object):
             with open(self.savename, 'rb') as handle:
                 return pickle.load(handle)
         else:
-            self.ingest(csvfile)
+            self.data = self.ingest(csvfile)
 
 
 
@@ -37,7 +37,7 @@ class FileLoader(object):
             for line in readfile:
                 rows.append(self.extract(line))
 
-        self.data = self.scale(np.array(rows))
+        return self.trawl(np.array(rows))
 
 
     # Data wide transformations, like scaling or standardization
@@ -54,6 +54,8 @@ class HMDALoader(FileLoader):
     # Constructor takes the base csvfile as well as a list of fields you want to look at.
     def __init__(self, csvfile, delimiter, feature_fields, labelfield):
 
+        self.delimiter = delimiter
+
         if labelfield in feature_fields:
             raise AttributeError("Predicted label shouldn't be in your feature fields")
 
@@ -61,9 +63,9 @@ class HMDALoader(FileLoader):
         self.label = labelfield
         # Build a logical index of all the headers that were chosen for easy retrieval of correct fields later
         with open(csvfile, 'r') as readfile:
-            self.header = readfile.readline().split(self.delimiter)
-            self.headerindex = np.zeros([1, len(self.header)])
-            self.labelindex = np.zeros([1, len(self.header)])
+            self.header = readfile.readline().strip().split(self.delimiter)
+            self.headerindex = np.zeros([len(self.header)]).astype('bool')
+            self.labelindex = np.zeros([len(self.header)]).astype('bool')
             try:
                 for field in feature_fields:
                     self.headerindex[self.header.index(field)] = 1
@@ -76,13 +78,7 @@ class HMDALoader(FileLoader):
         super(HMDALoader, self).__init__(csvfile, delimiter)
 
 
-    # Implementing an extract method to get all the fields I want.
-    def extract(self, row):
-        features = np.array(row.split(self.delimiter))[self.headerindex]
-        labels = np.array(row.split(self.delimiter))[self.labelindex]
 
-        #Returning features with a label value at the very end.
-        return np.concatenate((features, labels))
 
 
 
@@ -93,8 +89,20 @@ class WayneLoanApprovalLoader(HMDALoader):
     def __init__(self, csvfile):
 
         delimiter = "\t" # Assuming I'm using a .tsv file
+
+        # Defining a map that creates binary labels from 'action_taken'
+        self.label_collapse_map = {"Application approved but not accepted" : 1,
+                                   "Application denied by financial institution" : 0,
+                                   "Loan originated" : 1,
+                                   "Preapproval request denied by financial institution" : 0
+                                   }
+
+        # holder state for items that are useful for feature importance tasks
         self.features_to_vector_idx = {}
         self.categoricals = {}
+        self.vector_headers = None
+
+        # typing map from fields to types I want to transform to
         self.feature_fields_map = {"tract_to_msamd_income" : 'float64',
                           "rate_spread" : 'float64',
                           "population" : 'float64',
@@ -113,7 +121,6 @@ class WayneLoanApprovalLoader(HMDALoader):
                           "co_applicant_sex_name" : 'categorical',
                           "co_applicant_race_name_1" : 'categorical',
                           "co_applicant_ethnicity_name" : 'categorical',
-                          "as_of_year" : 'float64',
                           "applicant_sex_name" : 'categorical',
                           "applicant_race_name_1" : 'categorical',
                           "applicant_ethnicity_name" : 'categorical',
@@ -128,50 +135,75 @@ class WayneLoanApprovalLoader(HMDALoader):
 
         def getColumnsNum(chunks):
 
-            if len(chunks) == 0:
+            if chunks is None:
                 return 0
             else:
-                sum = 0
-                for chunk in chunks:
-                    sum += chunk.shape[1]
-
-                return sum
+                return chunks.shape[1] - 1
 
 
-        chunks = [] # I'll be making submatrices here that I'll stitch together at the very end.
+        chunks = None # I'll be making submatrices here that I'll stitch together at the very end.
 
         # Python doesn't have type matching as good as scala's... so here I am matching on a manually built map.
         for field in self.features:
 
             # If the field is a float field, then standardize the whole row.
             if self.feature_fields_map[field] == 'float64':
-                chunk = scale(np.expand_dims(self.data[:, self.features.index(field)], 1))
+                column = [x if len(x) > 0 else 0 for x in data[:, self.features.index(field)] ] # Cleaning out empty vals
+                chunk = scale(np.expand_dims(column, 1).astype('float64'))
 
                 self.features_to_vector_idx[field] = getColumnsNum(chunks)  # To let us know where in the vec a feature is
-                chunks.append(chunk)
+
+                if chunks is None:
+                    chunks = chunk
+                else:
+                    chunks = np.concatenate((chunks, chunk), 1)
 
 
 
             # If the field is categorical, then replace the column with onehot encodings.
             elif self.feature_fields_map[field] == 'categorical':
                 lb = LabelBinarizer()
-                lb.fit(self.data[:, self.features.index(field)])
-                chunk = lb.transform(self.data[:, self.features.index(field)])
+                lb.fit(data[:, self.features.index(field)])
+                lb.classes_ = sorted(lb.classes_)
+                chunk = lb.transform(data[:, self.features.index(field)])
 
                 self.features_to_vector_idx[field] = getColumnsNum(chunks) # To let us know where in the vec a feature is
                 self.categoricals[field] = lb.classes_ # To let us know what categories were encoded
-                chunks.append(chunk)
 
-
-
+                if chunks is None:
+                    chunks = chunk
+                else:
+                    chunks = np.concatenate((chunks, chunk), 1)
 
         # Save the labelfield for last.
-        
+        labels = np.expand_dims(data[:, -1], 1)
+        chunks = np.concatenate((chunks, labels), 1)
 
+        # Putting together the full list of the new features we just transformed
+        # These can later be aligned with weight vectors from models and whatnot
+        # which is generally useful for model explainability
+        headers = []
+        for field in self.features:
+            if self.feature_fields_map[field] == 'float64':
+                headers.append(field)
+            elif self.feature_fields_map[field] == 'categorical':
+                categories = list(self.categoricals[field])
+                if len(categories) > 2:
+                    headers += [field + ": " + category for category in list(self.categoricals[field])]
+                elif len(categories) == 2:
+                    headers += [categories[0] + "/" + categories[1]]
+                else:
+                    headers += [categories[0]]
 
+        self.vector_headers = headers
 
+        return chunks.astype('float64')
 
+    # Implementing an extract method to get all the fields I want.
+    def extract(self, textrow):
+        row = np.array(textrow.split(self.delimiter)[:-1])
+        features = row[self.headerindex] # [np.array of mixed type]
+        labels = [self.label_collapse_map[row[self.labelindex][0]]]  # [int]
 
-
-
-
+        # Returning features with a label value at the very end.
+        return np.concatenate((features, labels))  # np.array row of mixed type
