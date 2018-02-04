@@ -4,17 +4,20 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearn.ensemble.forest import RandomForestClassifier
+from sklearn.ensemble.bagging import BaggingClassifier
 
-wayne_2007_2010 = WayneLoanApprovalLoader('wayne_county_2007_2010.tsv')
-wayne_2011_2014 = WayneLoanApprovalLoader('wayne_county_2011_2014.tsv')
+wayne_2007_2010 = WayneLoanApprovalLoader(savename='wayne1', csvfile='wayne_county_2007_2010.tsv')
+wayne_2011_2014 = WayneLoanApprovalLoader(savename='wayne2', csvfile='wayne_county_2011_2014.tsv')
 
 # We have some data, now lets choose a model and some metrics.
-model_1 = RandomForestClassifier()
-model_2 = RandomForestClassifier()
+lr1 = LogisticRegression()
+lr2 = LogisticRegression()
+
+
 criterion = accuracy_score # Thankfully this task has a pretty easy evaluation... you either get it right or wrong
 
-expmt_2007_2010 = StratifiedExperiment(model_1, criterion, wayne_2007_2010.data[:, :-1], wayne_2007_2010.data[:, -1])
-expmt_2011_2014 = StratifiedExperiment(model_2, criterion, wayne_2011_2014.data[:, :-1], wayne_2011_2014.data[:, -1])
+expmt_2007_2010 = StratifiedExperiment(lr1, criterion, wayne_2007_2010.data[:, :-1], wayne_2007_2010.data[:, -1])
+expmt_2011_2014 = StratifiedExperiment(lr2, criterion, wayne_2011_2014.data[:, :-1], wayne_2011_2014.data[:, -1])
 
 trainvals = []
 testvals = []
