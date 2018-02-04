@@ -19,7 +19,8 @@ class FileLoader(object):
                 return pickle.load(handle)
         else:
             self.data = self.ingest(csvfile)
-
+            with open(self.savename, 'wb') as handle:
+                pickle.dump(self, handle)
 
 
     # Check if saved data array already exists.
