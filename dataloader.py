@@ -85,6 +85,7 @@ class HMDALoader(FileLoader):
 
 # The specific loader I'm using for this problem.
 # Here is where I bound my features and transform them into vectors appropriate for my modeling approach.
+# I'm also adding a date index to let me explore some hypotheses about time...
 class WayneLoanApprovalLoader(HMDALoader):
 
     def __init__(self, savename, csvfile, feature_fields_map = None):
@@ -102,6 +103,9 @@ class WayneLoanApprovalLoader(HMDALoader):
         self.features_to_vector_idx = {}
         self.categoricals = {}
         self.vector_headers = None
+
+        # Important val for indexing based on time.
+        self.date_column = []
 
         # typing map from fields to types I want to transform to
         if feature_fields_map is None:
@@ -205,9 +209,26 @@ class WayneLoanApprovalLoader(HMDALoader):
 
     # Implementing an extract method to get all the fields I want.
     def extract(self, textrow):
+
         row = np.array(textrow.split(self.delimiter)[:-1])
         features = row[self.headerindex] # [np.array of mixed type]
         labels = [self.label_collapse_map[row[self.labelindex][0]]]  # [int]
 
+        # Compiling my data column row by row
+        self.date_column.append(row[self.header.index('as_of_year')])
+
         # Returning features with a label value at the very end.
         return np.concatenate((features, labels))  # np.array row of mixed type
+
+    # This method lets you quickly index by date to pull out chunks of data.
+    def get_dates(self, datelist):
+
+        index = np.zeros([self.data.shape[0]]).astype('bool')
+
+        for date in datelist:
+
+            index += np.array(self.date_column).astype('int') == int(date)
+
+        return self.data[index, :]
+
+
