@@ -1,4 +1,4 @@
-# Investigating HDMA Data
+# Investigating HMDA Data
 
 Here I try to classify whether a mortgage application will be approved using features available in the HDMA database.
 
