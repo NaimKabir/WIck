@@ -80,30 +80,34 @@ def get_conmat(input_model, features, labels, runs):
 #
 # plt.show()
 
-# Neural net experiment
-nn_model = LoanPytorchModel(wayne_all.data[:, :-1].shape[1], 1, batch_size=4, epochs=5, layers=4)
-nn_experiment = StratifiedExperiment(nn_model, criterion, wayne_all.data[:, :-1], wayne_all.data[:, -1],
-                                             test_size=0.2)
-
-print("\nNEURAL NETWORK PERFORMANCE:")
-do_runs(nn_experiment, 1)
-
-
 # Just doing an experiment over all time now that we've established the distributions the observations are drawn from
 # are fairly similar
-strat_model = LogisticRegression()
-stratified_experiment = StratifiedExperiment(strat_model, criterion, wayne_all.data[:, :-1], wayne_all.data[:, -1],
-                                             test_size=0.8)
 
 # To investigate failures let's look at the confusion matrix from multiple runs as well.
 
 #I'm going to make a meta-split in the data used to train and test models, so we can compare experiment types.
 
 ## Trying stratified
+strat_model = LogisticRegression()
+stratified_experiment = StratifiedExperiment(strat_model, criterion, wayne_all.data[:, :-1], wayne_all.data[:, -1],
+                                             test_size=0.2)
+
 train_idx, test_idx = stratified_experiment.partition(wayne_all.data[:, :-1], wayne_all.data[:, -1])
+
 stratified_experiment = StratifiedExperiment(strat_model,
                                              criterion, wayne_all.data[train_idx, :-1],
                                              wayne_all.data[train_idx, -1], test_size=0.8)
+
+
+# Neural net experiment
+nn_model = LoanPytorchModel(wayne_all.data[:, :-1].shape[1], 1, batch_size=10, epochs=10, layers=4)
+nn_experiment = StratifiedExperiment(nn_model, criterion, wayne_all.data[train_idx, :-1], wayne_all.data[train_idx, -1],
+                                             test_size=0.2)
+
+print("\nNEURAL NETWORK PERFORMANCE:")
+do_runs(nn_experiment, 1)
+get_conmat(nn_model, wayne_all.data[test_idx, :-1], wayne_all.data[test_idx, -1], 10)
+
 
 print("\nSTRATIFIED:")
 do_runs(stratified_experiment, 10)

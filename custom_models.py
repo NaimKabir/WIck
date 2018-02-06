@@ -4,7 +4,7 @@ import torch.nn as nn
 from collections import OrderedDict
 from torch.utils.data import Dataset, DataLoader
 from torch.autograd import Variable
-from torch.optim import Adadelta, SGD
+from torch.optim import Adadelta, SGD, RMSprop
 
 # Class to make sure all model objects jive well with the rest of the code body
 class Model(object):
@@ -74,6 +74,7 @@ class PytorchModel(Model):
                 #     break
 
                 # Back-propagating and and then applying the gradients to the neural network weights.
+                self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
@@ -100,7 +101,7 @@ class LoanPytorchModel(PytorchModel):
 
         self.net = LoanNet(input_dim, output_dim, layers)
         self.loss = nn.BCELoss() # Because we're training for a binary classification.
-        self.optimizer = SGD(self.net.parameters(), lr=0.1)
+        self.optimizer = SGD(self.net.parameters(), lr = 0.01)
 
 # Actual neural  net model I can plug into one of my classes above to help with my problem.
 class LoanNet(nn.Module):
@@ -112,7 +113,7 @@ class LoanNet(nn.Module):
         super(LoanNet, self).__init__()
 
         input_dim = int(input_dim)
-        half_dim = int(input_dim/2)
+        half_dim = int(input_dim*2)
         output_dim = int(output_dim)
 
         layer_dict = OrderedDict()
@@ -121,7 +122,7 @@ class LoanNet(nn.Module):
 
         for layer in range(layers):
             layer_dict['linear' + str(layer + 1)] = nn.Linear(half_dim, half_dim)
-            layer_dict['nonlinear' + str(layer + 1)] = nn.Sigmoid()
+            layer_dict['nonlinear' + str(layer + 1)] = nn.ReLU()
 
         layer_dict['final'] = nn.Linear(half_dim, output_dim)
         layer_dict['nonlinear'] = nn.Sigmoid() # Final layer because I want to output a probability.

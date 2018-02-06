@@ -27,7 +27,7 @@ class Experiment(object):
         self.last_test_idx = test_idx
         self.last_train_idx = train_idx
 
-        print("%d FEATURES \t %d LABELS" % (len(train_idx), len(test_idx)))
+        print("%d TRAIN SAMPLES \t %d TEST SAMPLES" % (len(train_idx), len(test_idx)))
 
         train_features, train_labels = self.features[train_idx, :], self.labels[train_idx]
         test_features, test_labels = self.features[test_idx, :], self.labels[test_idx]
