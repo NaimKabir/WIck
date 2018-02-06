@@ -11,6 +11,8 @@ from sklearn.naive_bayes import GaussianNB as NB
 from custom_models import BinaryDummyModel
 from matplotlib import pyplot as plt
 
+from custom_models import LoanPytorchModel
+
 #Pulling in all data from 2007-2014
 wayne_all = WayneLoanApprovalLoader(savename='wayne_all', csvfile='wayne_county_2007_2014.tsv')
 
@@ -59,24 +61,33 @@ def get_conmat(input_model, features, labels, runs):
     print("\n")
     print(conmat)
 
-do_runs(expmt_time1, 10)
-do_runs(expmt_time2, 10)
+# do_runs(expmt_time1, 10)
+# do_runs(expmt_time2, 10)
+#
+#
+# # Plotting the results of the time experiment
+#
+# plt.figure(0)
+# tickpos = np.arange(len(wayne_all.vector_headers))*2
+# one = plt.barh(tickpos, timemodels[0].coef_[0], align='center', alpha=0.5, height=2)
+# plt.yticks(tickpos, wayne_all.vector_headers)
+#
+# two = plt.barh(tickpos, timemodels[1].coef_[0], align='center', alpha=0.5, height=2)
+#
+# plt.legend((one, two), ('2007-2010', '2011-2014'))
+# plt.xlabel("Model Weight")
+# plt.tick_params(axis='both', which='major', labelsize=8, rotation=45)
+#
+# plt.show()
 
+# Neural net experiment
+nn_model = LoanPytorchModel(wayne_all.data[:, :-1].shape[1], 1, batch_size=4)
+nn_experiment = StratifiedExperiment(nn_model, criterion, wayne_all.data[:, :-1], wayne_all.data[:, -1],
+                                             test_size=0.2)
 
-# Plotting the results of the time experiment
+print("\nNEURAL NETWORK PERFORMANCE:")
+do_runs(nn_experiment, 1)
 
-plt.figure(0)
-tickpos = np.arange(len(wayne_all.vector_headers))*2
-one = plt.barh(tickpos, timemodels[0].coef_[0], align='center', alpha=0.5, height=2)
-plt.yticks(tickpos, wayne_all.vector_headers)
-
-two = plt.barh(tickpos, timemodels[1].coef_[0], align='center', alpha=0.5, height=2)
-
-plt.legend((one, two), ('2007-2010', '2011-2014'))
-plt.xlabel("Model Weight")
-plt.tick_params(axis='both', which='major', labelsize=8, rotation=45)
-
-plt.show()
 
 # Just doing an experiment over all time now that we've established the distributions the observations are drawn from
 # are fairly similar
