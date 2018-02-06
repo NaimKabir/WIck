@@ -81,7 +81,7 @@ def get_conmat(input_model, features, labels, runs):
 # plt.show()
 
 # Neural net experiment
-nn_model = LoanPytorchModel(wayne_all.data[:, :-1].shape[1], 1, batch_size=4)
+nn_model = LoanPytorchModel(wayne_all.data[:, :-1].shape[1], 1, batch_size=4, epochs=5, layers=4)
 nn_experiment = StratifiedExperiment(nn_model, criterion, wayne_all.data[:, :-1], wayne_all.data[:, -1],
                                              test_size=0.2)
 

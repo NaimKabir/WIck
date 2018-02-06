@@ -4,7 +4,7 @@ import torch.nn as nn
 from collections import OrderedDict
 from torch.utils.data import Dataset, DataLoader
 from torch.autograd import Variable
-from torch.optim import Adadelta
+from torch.optim import Adadelta, SGD
 
 # Class to make sure all model objects jive well with the rest of the code body
 class Model(object):
@@ -68,10 +68,10 @@ class PytorchModel(Model):
                 if len(losses) > 100:
                     losses.pop(0)
 
-                if np.abs(np.mean(losses)) < self.early_stopping_threshold:
-                    # Saving model just in case it took a ridiculous amount of time for it to get good.
-                    th.save(self.net, "nn.pt")
-                    break
+                # if np.abs(np.mean(np.diff(losses))) < self.early_stopping_threshold:
+                #     # Saving model just in case it took a ridiculous amount of time for it to get good.
+                #     th.save(self.net, "nn.pt")
+                #     break
 
                 # Back-propagating and and then applying the gradients to the neural network weights.
                 loss.backward()
@@ -93,14 +93,14 @@ class PytorchModel(Model):
 # This is the tiny class I'm actually using to predict things in the task
 class LoanPytorchModel(PytorchModel):
 
-    def __init__(self, input_dim, output_dim, batch_size, layers=2):
+    def __init__(self, input_dim, output_dim, batch_size, epochs, layers=2):
 
         early_stopping_threshold = 0.01
-        super(LoanPytorchModel, self).__init__(batch_size, early_stopping_threshold, 10)
+        super(LoanPytorchModel, self).__init__(batch_size, early_stopping_threshold, epochs)
 
         self.net = LoanNet(input_dim, output_dim, layers)
         self.loss = nn.BCELoss() # Because we're training for a binary classification.
-        self.optimizer = Adadelta(self.net.parameters())
+        self.optimizer = SGD(self.net.parameters(), lr=0.1)
 
 # Actual neural  net model I can plug into one of my classes above to help with my problem.
 class LoanNet(nn.Module):
@@ -121,7 +121,7 @@ class LoanNet(nn.Module):
 
         for layer in range(layers):
             layer_dict['linear' + str(layer + 1)] = nn.Linear(half_dim, half_dim)
-            layer_dict['relu' + str(layer + 1)] = nn.ReLU()
+            layer_dict['nonlinear' + str(layer + 1)] = nn.Sigmoid()
 
         layer_dict['final'] = nn.Linear(half_dim, output_dim)
         layer_dict['nonlinear'] = nn.Sigmoid() # Final layer because I want to output a probability.
