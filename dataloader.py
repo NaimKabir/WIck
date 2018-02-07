@@ -109,15 +109,15 @@ class WayneLoanApprovalLoader(HMDALoader):
 
         # typing map from fields to types I want to transform to
         if feature_fields_map is None:
-            self.feature_fields_map = {"tract_to_msamd_income" : 'float64',
-                              "rate_spread" : 'float64',
-                              "population" : 'float64',
-                              "minority_population" : 'float64',
-                              "number_of_owner_occupied_units" : 'float64',
-                              "number_of_1_to_4_family_units" : 'float64',
-                              "loan_amount_000s" : 'float64',
-                              "hud_median_family_income" : 'float64',
-                              "applicant_income_000s" : 'float64',
+            self.feature_fields_map = {"tract_to_msamd_income" : 'indicator',
+                              "rate_spread" : 'indicator',
+                              "population" : 'indicator',
+                              "minority_population" : 'indicator',
+                              "number_of_owner_occupied_units" : 'indicator',
+                              "number_of_1_to_4_family_units" : 'indicator',
+                              "loan_amount_000s" : 'indicator',
+                              "hud_median_family_income" : 'indicator',
+                              "applicant_income_000s" : 'indicator',
                               "property_type_name" : 'categorical',
                               "preapproval_name" : 'categorical',
                               "owner_occupancy_name" : 'categorical',
@@ -183,6 +183,18 @@ class WayneLoanApprovalLoader(HMDALoader):
                 else:
                     chunks = np.concatenate((chunks, chunk), 1)
 
+            elif self.feature_fields_map[field] == 'indicator':
+
+                double_column = [[x, 0] if len(x) > 0 else [0, 1] for x in data[:, self.features.index(field)]]
+                double_column = np.array(double_column)
+                indicators = double_column[:, 1]
+                vals = scale(double_column[:, 0])
+
+                if chunks is None:
+                    chunks = np.concatenate((np.expand_dims(vals, 1), np.expand_dims(indicators, 1)), 1)
+                else:
+                    chunks = np.concatenate((chunks, np.expand_dims(vals, 1), np.expand_dims(indicators,1)), 1)
+
         # Save the labelfield for last.
         labels = np.expand_dims(data[:, -1], 1)
         chunks = np.concatenate((chunks, labels), 1)
@@ -192,7 +204,7 @@ class WayneLoanApprovalLoader(HMDALoader):
         # which is generally useful for model explainability
         headers = []
         for field in self.features:
-            if self.feature_fields_map[field] == 'float64':
+            if self.feature_fields_map[field] == 'float64' :
                 headers.append(field)
             elif self.feature_fields_map[field] == 'categorical':
                 categories = list(self.categoricals[field])
@@ -202,6 +214,9 @@ class WayneLoanApprovalLoader(HMDALoader):
                     headers += [categories[0] + "/" + categories[1]]
                 else:
                     headers += [categories[0]]
+            elif self.feature_fields_map[field] == 'indicator':
+                headers.append(field)
+                headers.append(field + "_indicator")
 
         self.vector_headers = headers
 

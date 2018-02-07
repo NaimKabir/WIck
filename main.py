@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.linear_model.logistic import LogisticRegression
 from sklearn.svm import SVC
-from sklearn.ensemble.forest import RandomForestClassifier
+from sklearn.ensemble.forest import RandomForestClassifier as RF
 from sklearn.ensemble.bagging import BaggingClassifier
 from sklearn.ensemble.weight_boosting import AdaBoostClassifier
 from sklearn.naive_bayes import GaussianNB as NB
@@ -14,7 +14,7 @@ from matplotlib import pyplot as plt
 from custom_models import LoanPytorchModel
 
 #Pulling in all data from 2007-2014
-wayne_all = WayneLoanApprovalLoader(savename='wayne_all', csvfile='wayne_county_2007_2014.tsv')
+wayne_all = WayneLoanApprovalLoader(savename='wayneall_indicator', csvfile='wayne_county_2007_2014.tsv')
 
 # We have some data, now lets choose a model and some metrics, before putting them into experiment objects.
 lr1 = LogisticRegression()
@@ -88,7 +88,7 @@ def get_conmat(input_model, features, labels, runs):
 #I'm going to make a meta-split in the data used to train and test models, so we can compare experiment types.
 
 ## Trying stratified
-strat_model = LogisticRegression()
+strat_model = AdaBoostClassifier()
 stratified_experiment = StratifiedExperiment(strat_model, criterion, wayne_all.data[:, :-1], wayne_all.data[:, -1],
                                              test_size=0.2)
 
@@ -96,7 +96,7 @@ train_idx, test_idx = stratified_experiment.partition(wayne_all.data[:, :-1], wa
 
 stratified_experiment = StratifiedExperiment(strat_model,
                                              criterion, wayne_all.data[train_idx, :-1],
-                                             wayne_all.data[train_idx, -1], test_size=0.8)
+                                             wayne_all.data[train_idx, -1], test_size=0.2)
 
 
 # Neural net experiment
@@ -104,7 +104,13 @@ nn_model = LoanPytorchModel(wayne_all.data[:, :-1].shape[1], 1, batch_size=10, e
 nn_experiment = StratifiedExperiment(nn_model, criterion, wayne_all.data[train_idx, :-1], wayne_all.data[train_idx, -1],
                                              test_size=0.2)
 
-print("\nNEURAL NETWORK PERFORMANCE:")
+print("\nSTAT EXPERIMENT NEURAL NETWORK PERFORMANCE:")
+do_runs(nn_experiment, 1)
+get_conmat(nn_model, wayne_all.data[test_idx, :-1], wayne_all.data[test_idx, -1], 10)
+
+print("\nBINARY BALANCED NEURAL NETWORK PERFORMANCE:")
+nn_experiment = BinaryBalancedExperiment(nn_model, criterion, wayne_all.data[train_idx, :-1], wayne_all.data[train_idx, -1],
+                                             test_size=0.2)
 do_runs(nn_experiment, 1)
 get_conmat(nn_model, wayne_all.data[test_idx, :-1], wayne_all.data[test_idx, -1], 10)
 
@@ -115,10 +121,10 @@ get_conmat(strat_model, wayne_all.data[test_idx, :-1], wayne_all.data[test_idx, 
 
 
 ## Trying balanced partitioning
-balanced_model = LogisticRegression()
+balanced_model = AdaBoostClassifier()
 balanced_experiment = BinaryBalancedExperiment(balanced_model, criterion,
                                                wayne_all.data[train_idx, :-1], wayne_all.data[train_idx, -1],
-                                               test_size=0.8)
+                                               test_size=0.2)
 
 print("\nBALANCED:")
 do_runs(balanced_experiment, 10)
